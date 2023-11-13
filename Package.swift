@@ -42,6 +42,7 @@ let swiftPMDataModelProduct = (
         "PackageMetadata",
         "PackageModel",
         "SourceControl",
+        "SwiftPM",
         "Workspace",
     ]
 )
@@ -146,6 +147,15 @@ let package = Package(
                 .unsafeFlags(["-enable-library-evolution"]),
             ],
             linkerSettings: packageLibraryLinkSettings
+        ),
+
+        // SwiftPM public API
+        .target(
+            name: "SwiftPM",
+            dependencies: [
+                "Build",
+                "SPMBuildCore"
+            ]
         ),
 
         // MARK: SwiftPM specific support libraries
