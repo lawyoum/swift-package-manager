@@ -69,6 +69,7 @@ public final class ResolvedTarget {
             conditions.allSatisfy { $0.satisfies(environment) }
         }
 
+        /// A copy of this dependency compiled for the build tool (host) triple.
         var buildToolsDependency: Dependency {
             switch self {
             case let .product(product, conditions):
