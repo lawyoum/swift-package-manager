@@ -58,7 +58,7 @@ public final class SwiftTargetBuildDescription {
     /// Path to the bundle generated for this module (if any).
     var bundlePath: AbsolutePath? {
         if let bundleName = target.underlyingTarget.potentialBundleName, needsResourceBundle {
-            return self.buildParameters.bundlePath(named: bundleName)
+            return self.buildParameters.bundlePath(named: bundleName, target: self.target)
         } else {
             return .none
         }
@@ -102,12 +102,19 @@ public final class SwiftTargetBuildDescription {
             }
         }
     }
+    
+    /// Triple for which this target is compiled.
+    private var buildTriple: Triple {
+        self.buildParameters.buildTriple(for: self.target)
+    }
 
     /// The path to the swiftmodule file after compilation.
     var moduleOutputPath: AbsolutePath {
         // If we're an executable and we're not allowing test targets to link against us, we hide the module.
-        let allowLinkingAgainstExecutables = (buildParameters.targetTriple.isDarwin() || self.buildParameters.targetTriple
-            .isLinux() || self.buildParameters.targetTriple.isWindows()) && self.toolsVersion >= .v5_5
+        let allowLinkingAgainstExecutables = (
+            self.buildTriple.isDarwin() ||
+            self.buildTriple.isLinux() ||
+            self.buildTriple.isWindows()) && self.toolsVersion >= .v5_5
         let dirPath = (target.type == .executable && !allowLinkingAgainstExecutables) ? self.tempsPath : self
             .buildParameters.buildPath
         return dirPath.appending(component: self.target.c99name + ".swiftmodule")
@@ -317,7 +324,7 @@ public final class SwiftTargetBuildDescription {
             return
         }
 
-        guard buildParameters.targetTriple.isDarwin(), buildParameters.testingParameters.experimentalTestOutput else {
+        guard self.buildTriple.isDarwin(), self.buildParameters.testingParameters.experimentalTestOutput else {
             return
         }
 
@@ -361,7 +368,7 @@ public final class SwiftTargetBuildDescription {
         guard let bundlePath else { return }
 
         let mainPathSubstitution: String
-        if self.buildParameters.targetTriple.isWASI() {
+        if self.buildTriple.isWASI() {
             // We prefer compile-time evaluation of the bundle path here for WASI. There's no benefit in evaluating this
             // at runtime, especially as `Bundle` support in WASI Foundation is partial. We expect all resource paths to
             // evaluate to `/\(resourceBundleName)/\(resourcePath)`, which allows us to pass this path to JS APIs like
@@ -456,7 +463,7 @@ public final class SwiftTargetBuildDescription {
     /// The arguments needed to compile this target.
     public func compileArguments() throws -> [String] {
         var args = [String]()
-        args += try self.buildParameters.targetTripleArgs(for: self.target)
+        args += try self.buildParameters.buildTripleArgs(for: self.target)
         args += ["-swift-version", self.swiftVersion.rawValue]
 
         // pass `-v` during verbose builds.
@@ -646,7 +653,7 @@ public final class SwiftTargetBuildDescription {
 
     /// Returns true if ObjC compatibility header should be emitted.
     private var shouldEmitObjCCompatibilityHeader: Bool {
-        self.buildParameters.targetTriple.isDarwin() && self.target.type == .library
+        self.buildTriple.isDarwin() && self.target.type == .library
     }
 
     func writeOutputFileMap() throws -> AbsolutePath {
@@ -849,7 +856,7 @@ public final class SwiftTargetBuildDescription {
         var arguments: [String] = []
 
         let isLinkingStaticStdlib = self.buildParameters.linkingParameters.shouldLinkStaticSwiftStdlib
-            && self.buildParameters.targetTriple.isSupportingStaticStdlib
+            && self.buildParameters.buildTriple(for: self.target).isSupportingStaticStdlib
         if isLinkingStaticStdlib {
             arguments += ["-static-stdlib"]
         }

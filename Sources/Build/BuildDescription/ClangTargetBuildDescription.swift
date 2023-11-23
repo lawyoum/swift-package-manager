@@ -50,12 +50,12 @@ public final class ClangTargetBuildDescription {
 
     /// Path to the bundle generated for this module (if any).
     var bundlePath: AbsolutePath? {
-        guard !resources.isEmpty else {
+        guard !self.resources.isEmpty else {
             return .none
         }
 
-        if let bundleName = target.underlyingTarget.potentialBundleName {
-            return self.buildParameters.bundlePath(named: bundleName)
+        if let bundleName = self.target.underlyingTarget.potentialBundleName {
+            return self.buildParameters.bundlePath(named: bundleName, target: self.target)
         } else {
             return .none
         }
@@ -103,6 +103,11 @@ public final class ClangTargetBuildDescription {
     /// If this target is a test target.
     public var isTestTarget: Bool {
         target.type == .test
+    }
+
+    /// Triple for which this target is compiled.
+    private var buildTriple: Triple {
+        self.buildParameters.buildTriple(for: self.target)
     }
 
     /// The results of applying any build tool plugins to this target.
@@ -216,22 +221,23 @@ public final class ClangTargetBuildDescription {
 
         var args = [String]()
         // Only enable ARC on macOS.
-        if buildParameters.targetTriple.isDarwin() {
+        if self.buildTriple.isDarwin() {
             args += ["-fobjc-arc"]
         }
-        args += try buildParameters.targetTripleArgs(for: target)
+        args += try self.buildParameters.buildTripleArgs(for: target)
 
         args += optimizationArguments
         args += activeCompilationConditions
         args += ["-fblocks"]
 
+        let buildTriple = self.buildTriple
         // Enable index store, if appropriate.
         //
         // This feature is not widely available in OSS clang. So, we only enable
         // index store for Apple's clang or if explicitly asked to.
         if ProcessEnv.vars.keys.contains("SWIFTPM_ENABLE_CLANG_INDEX_STORE") {
             args += buildParameters.indexStoreArguments(for: target)
-        } else if buildParameters.targetTriple.isDarwin(),
+        } else if buildTriple.isDarwin(),
                   (try? buildParameters.toolchain._isClangCompilerVendorApple()) == true
         {
             args += buildParameters.indexStoreArguments(for: target)
@@ -244,13 +250,12 @@ public final class ClangTargetBuildDescription {
             // 1. on Darwin when compiling for C++, because C++ modules are disabled on Apple-built Clang releases
             // 2. on Windows when compiling for any language, because of issues with the Windows SDK
             // 3. on Android when compiling for any language, because of issues with the Android SDK
-            enableModules = !(buildParameters.targetTriple.isDarwin() && isCXX) && !buildParameters.targetTriple
-                .isWindows() && !buildParameters.targetTriple.isAndroid()
+            enableModules = !(buildTriple.isDarwin() && isCXX) && !buildTriple.isWindows() && !buildTriple.isAndroid()
         } else {
             // For version >= 5.8, we disable them when compiling for C++ regardless of platforms, see:
             // https://github.com/llvm/llvm-project/issues/55980 for clang frontend crash when module
             // enabled for C++ on c++17 standard and above.
-            enableModules = !isCXX && !buildParameters.targetTriple.isWindows() && !buildParameters.targetTriple.isAndroid()
+            enableModules = !isCXX && !buildTriple.isWindows() && !buildTriple.isAndroid()
         }
 
         if enableModules {

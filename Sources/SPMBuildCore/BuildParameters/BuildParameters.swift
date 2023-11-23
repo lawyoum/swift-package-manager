@@ -271,11 +271,9 @@ public struct BuildParameters: Encodable {
 
     /// Returns the path to the binary of a product for the current build parameters, relative to the build directory.
     public func binaryRelativePath(for product: ResolvedProduct) throws -> RelativePath {
-        let potentialExecutablePath = try RelativePath(validating: "\(product.name)\(targetTriple.executableExtension)")
-
         switch product.type {
         case .executable, .snippet:
-            return potentialExecutablePath
+            return try RelativePath(validating: "\(product.name)\(targetTriple.executableExtension)")
         case .library(.static):
             return try RelativePath(validating: "lib\(product.name)\(targetTriple.staticLibraryExtension)")
         case .library(.dynamic):
@@ -297,7 +295,7 @@ public struct BuildParameters: Encodable {
             #if BUILD_MACROS_AS_DYLIBS
             return try potentialDynamicLibraryPath(for: product)
             #else
-            return potentialExecutablePath
+            return try RelativePath(validating: "\(product.name)\(hostTriple.executableExtension)")
             #endif
         }
     }

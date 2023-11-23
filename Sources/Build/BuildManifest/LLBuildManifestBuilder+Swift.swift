@@ -516,7 +516,7 @@ extension LLBuildManifestBuilder {
             "-modulewrap", target.moduleOutputPath.pathString,
             "-o", target.wrappedModuleOutputPath.pathString,
         ]
-        moduleWrapArgs += try self.buildParameters.targetTripleArgs(for: target.target)
+        moduleWrapArgs += try self.buildParameters.buildTripleArgs(for: target.target)
         self.manifest.addShellCmd(
             name: target.wrappedModuleOutputPath.pathString,
             description: "Wrapping AST for \(target.target.name) for debugging",

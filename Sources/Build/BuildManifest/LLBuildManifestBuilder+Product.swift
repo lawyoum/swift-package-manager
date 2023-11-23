@@ -20,7 +20,7 @@ extension LLBuildManifestBuilder {
         // Add dependency on Info.plist generation on Darwin platforms.
         let testInputs: [AbsolutePath]
         if buildProduct.product.type == .test
-            && buildProduct.buildParameters.targetTriple.isDarwin()
+            && buildProduct.buildTriple.isDarwin()
             && buildProduct.buildParameters.testingParameters.experimentalTestOutput {
             let testBundleInfoPlistPath = try buildProduct.binaryPath.parentDirectory.parentDirectory.appending(component: "Info.plist")
             testInputs = [testBundleInfoPlistPath]
@@ -59,7 +59,7 @@ extension LLBuildManifestBuilder {
             let linkedBinaryNode: Node
             let linkedBinaryPath = try buildProduct.binaryPath
             if case .executable = buildProduct.product.type,
-               buildParameters.targetTriple.isMacOSX,
+               buildProduct.buildTriple.isMacOSX,
                buildParameters.debuggingParameters.shouldEnableDebuggingEntitlement {
                 shouldCodeSign = true
                 linkedBinaryNode = try .file(buildProduct.binaryPath, isMutated: true)

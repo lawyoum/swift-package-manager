@@ -68,6 +68,11 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         self.tempsPath.appending("Objects.LinkFileList")
     }
 
+    /// Triple for which this product is compiled.
+    var buildTriple: Triple {
+        self.buildParameters.buildTriple(for: self.product)
+    }
+
     /// File system reference.
     private let fileSystem: FileSystem
 
@@ -110,15 +115,16 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             return []
         }
 
+        let buildTriple = self.buildTriple
         switch self.buildParameters.configuration {
         case .debug:
             return []
         case .release:
-            if self.buildParameters.targetTriple.isApple() {
+            if buildTriple.isApple() {
                 return ["-Xlinker", "-dead_strip"]
-            } else if self.buildParameters.targetTriple.isWindows() {
+            } else if buildTriple.isWindows() {
                 return ["-Xlinker", "/OPT:REF"]
-            } else if self.buildParameters.targetTriple.arch == .wasm32 {
+            } else if buildTriple.arch == .wasm32 {
                 // FIXME: wasm-ld strips data segments referenced through __start/__stop symbols
                 // during GC, and it removes Swift metadata sections like swift5_protocols
                 // We should add support of SHF_GNU_RETAIN-like flag for __attribute__((retain))
@@ -136,7 +142,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
     /// The arguments to the librarian to create a static library.
     public func archiveArguments() throws -> [String] {
         let librarian = self.buildParameters.toolchain.librarianPath.pathString
-        let triple = self.buildParameters.targetTriple
+        let triple = self.buildTriple
         if triple.isWindows(), librarian.hasSuffix("link") || librarian.hasSuffix("link.exe") {
             return try [librarian, "/LIB", "/OUT:\(binaryPath.pathString)", "@\(self.linkFileListPath.pathString)"]
         }
@@ -187,6 +193,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         }
 
         var isLinkingStaticStdlib = false
+        let buildTriple = self.buildTriple
         switch derivedProductType {
         case .macro:
             throw InternalError("macro not supported") // should never be reached
@@ -206,7 +213,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             args += self.deadStripArguments
         case .library(.dynamic):
             args += ["-emit-library"]
-            if self.buildParameters.targetTriple.isDarwin() {
+            if buildTriple.isDarwin() {
                 let relativePath = try "@rpath/\(buildParameters.binaryRelativePath(for: self.product).pathString)"
                 args += ["-Xlinker", "-install_name", "-Xlinker", relativePath]
             }
@@ -215,9 +222,9 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             // Link the Swift stdlib statically, if requested.
             // TODO: unify this logic with SwiftTargetBuildDescription.stdlibArguments
             if self.buildParameters.linkingParameters.shouldLinkStaticSwiftStdlib {
-                if self.buildParameters.targetTriple.isDarwin() {
+                if buildTriple.isDarwin() {
                     self.observabilityScope.emit(.swiftBackDeployError)
-                } else if self.buildParameters.targetTriple.isSupportingStaticStdlib {
+                } else if buildTriple.isSupportingStaticStdlib {
                     args += ["-static-stdlib"]
                     isLinkingStaticStdlib = true
                 }
@@ -260,9 +267,9 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         // Set rpath such that dynamic libraries are looked up
         // adjacent to the product, unless overridden.
         if !self.buildParameters.linkingParameters.shouldDisableLocalRpath {
-            if self.buildParameters.targetTriple.isLinux() {
+            if buildTriple.isLinux() {
                 args += ["-Xlinker", "-rpath=$ORIGIN"]
-            } else if self.buildParameters.targetTriple.isDarwin() {
+            } else if buildTriple.isDarwin() {
                 let rpath = self.product.type == .test ? "@loader_path/../../../" : "@loader_path"
                 args += ["-Xlinker", "-rpath", "-Xlinker", rpath]
             }
@@ -283,7 +290,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
 
             // When deploying to macOS prior to macOS 12, add an rpath to the
             // back-deployed concurrency libraries.
-            if useStdlibRpath, self.buildParameters.targetTriple.isMacOSX {
+            if useStdlibRpath, buildTriple.isMacOSX {
                 let macOSSupportedPlatform = self.package.platforms.getDerived(for: .macOS, usingXCTest: product.isLinkingXCTest)
                 if macOSSupportedPlatform.version.major < 12 {
                     let backDeployedStdlib = try buildParameters.toolchain.macosSwiftStdlib
@@ -308,7 +315,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         // setting is the package-level right now. We might need to figure out a better
         // answer for libraries if/when we support specifying deployment target at the
         // target-level.
-        args += try self.buildParameters.targetTripleArgs(for: self.product.targets[0])
+        args += try self.buildParameters.buildTripleArgs(for: self.product.targets[0])
 
         // Add arguments from declared build settings.
         args += self.buildSettingsFlags
@@ -351,7 +358,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         flags += libraries.map { "-l" + $0 }
 
         // Linked frameworks.
-        if self.buildParameters.targetTriple.supportsFrameworks {
+        if self.buildTriple.supportsFrameworks {
             let frameworks = OrderedSet(self.staticTargets.reduce([]) {
                 $0 + self.buildParameters.createScope(for: $1).evaluate(.LINK_FRAMEWORKS)
             })

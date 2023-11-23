@@ -39,7 +39,7 @@ extension BuildPlan {
                 swiftTarget.additionalFlags += try pkgConfig(for: target).cFlags
             case let target as BinaryTarget:
                 if case .xcframework = target.kind {
-                    let libraries = try self.parseXCFramework(for: target)
+                    let libraries = try self.parseXCFramework(for: target, target: swiftTarget.target)
                     for library in libraries {
                         library.headersPaths.forEach {
                             swiftTarget.additionalFlags += ["-I", $0.pathString, "-Xcc", "-I", "-Xcc", $0.pathString]

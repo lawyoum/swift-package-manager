@@ -54,10 +54,22 @@ public final class ResolvedProduct {
         }
     }
 
+    /// Triple for which this resolved product should be compiled for.
+    public let buildTriple: BuildTriple
+
     public init(product: Product, targets: [ResolvedTarget]) {
+        let processedTargets: [ResolvedTarget]
+        if product.type == .macro || product.type == .plugin {
+            self.buildTriple = .buildTools
+            processedTargets = targets.map(\.buildToolsTarget)
+        } else {
+            self.buildTriple = .buildProducts
+            processedTargets = targets
+        }
+
         assert(product.targets.count == targets.count && product.targets.map({ $0.name }) == targets.map({ $0.name }))
         self.underlyingProduct = product
-        self.targets = targets
+        self.targets = processedTargets
 
         // defaultLocalization is currently shared across the entire package
         // this may need to be enhanced if / when we support localization per target or product
@@ -70,10 +82,13 @@ public final class ResolvedProduct {
         self.testEntryPointTarget = underlyingProduct.testEntryPointPath.map { testEntryPointPath in
             // Create an executable resolved target with the entry point file, adding product's targets as dependencies.
             let dependencies: [Target.Dependency] = product.targets.map { .target($0, conditions: []) }
-            let swiftTarget = SwiftTarget(name: product.name,
-                                          dependencies: dependencies,
-                                          packageAccess: true, // entry point target so treated as a part of the package
-                                          testEntryPointPath: testEntryPointPath)
+            let swiftTarget = SwiftTarget(
+                name: product.name,
+                dependencies: dependencies,
+                packageAccess: true,
+                // entry point target so treated as a part of the package
+                testEntryPointPath: testEntryPointPath
+            )
             return ResolvedTarget(
                 target: swiftTarget,
                 dependencies: targets.map { .target($0, conditions: []) },

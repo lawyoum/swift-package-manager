@@ -127,27 +127,58 @@ extension BuildParameters {
         return []
     }
 
+    /// Triple for which this target is compiled.
+    func buildTriple(for target: ResolvedTarget) -> Basics.Triple {
+        switch target.buildTriple {
+        case .buildTools:
+            return self.hostTriple
+        case .buildProducts:
+            return self.targetTriple
+        }
+    }
+
+    /// Triple for which this target is compiled.
+    func buildTriple(for product: ResolvedProduct) -> Basics.Triple {
+        switch product.buildTriple {
+        case .buildTools:
+            return self.hostTriple
+        case .buildProducts:
+            return self.targetTriple
+        }
+    }
+
     /// Computes the target triple arguments for a given resolved target.
+    @available(*, deprecated, renamed: "buildTripleArgs(for:)")
     public func targetTripleArgs(for target: ResolvedTarget) throws -> [String] {
+        try buildTripleArgs(for: target)
+    }
+    
+    public func buildTripleArgs(for target: ResolvedTarget) throws -> [String] {
+        // confusingly enough this is the triple argument, not the target argument
         var args = ["-target"]
+
+        let buildTriple = buildTriple(for: target)
+
         // Compute the triple string for Darwin platform using the platform version.
-        if targetTriple.isDarwin() {
+        if buildTriple.isDarwin() {
             let platform = buildEnvironment.platform
             let supportedPlatform = target.platforms.getDerived(for: platform, usingXCTest: target.type == .test)
-            args += [targetTriple.tripleString(forPlatformVersion: supportedPlatform.version.versionString)]
+            args += [buildTriple.tripleString(forPlatformVersion: supportedPlatform.version.versionString)]
         } else {
-            args += [targetTriple.tripleString]
+            args += [buildTriple.tripleString]
         }
         return args
     }
 
     /// Computes the linker flags to use in order to rename a module-named main function to 'main' for the target platform, or nil if the linker doesn't support it for the platform.
     func linkerFlagsForRenamingMainFunction(of target: ResolvedTarget) -> [String]? {
+        let buildTriple = buildTriple(for: target)
+
         let args: [String]
-        if self.targetTriple.isApple() {
+        if buildTriple.isApple() {
             args = ["-alias", "_\(target.c99name)_main", "_main"]
         }
-        else if self.targetTriple.isLinux() {
+        else if buildTriple.isLinux() {
             args = ["--defsym", "main=\(target.c99name)_main"]
         }
         else {
@@ -293,7 +324,7 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                 switch dependency {
                 case .target: break
                 case .product(let product, _):
-                    if buildParameters.targetTriple.isDarwin() {
+                    if buildParameters.buildTriple(for: product).isDarwin() {
                         try BuildPlan.validateDeploymentVersionOfProductDependency(
                             product: product,
                             forTarget: target,
@@ -562,9 +593,12 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
     }
 
     /// Extracts the library information from an XCFramework.
-    func parseXCFramework(for target: BinaryTarget) throws -> [LibraryInfo] {
-        try self.externalLibrariesCache.memoize(key: target) {
-            return try target.parseXCFrameworks(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
+    func parseXCFramework(for binaryTarget: BinaryTarget, target: ResolvedTarget) throws -> [LibraryInfo] {
+        try self.externalLibrariesCache.memoize(key: binaryTarget) {
+            return try binaryTarget.parseXCFrameworks(
+                for: self.buildParameters.buildTriple(for: target),
+                fileSystem: self.fileSystem
+            )
         }
     }
 }
@@ -599,8 +633,8 @@ extension Basics.Diagnostic {
 
 extension BuildParameters {
     /// Returns a named bundle's path inside the build directory.
-    func bundlePath(named name: String) -> AbsolutePath {
-        return buildPath.appending(component: name + targetTriple.nsbundleExtension)
+    func bundlePath(named name: String, target: ResolvedTarget) -> AbsolutePath {
+        return buildPath.appending(component: name + self.buildTriple(for: target).nsbundleExtension)
     }
 }
 

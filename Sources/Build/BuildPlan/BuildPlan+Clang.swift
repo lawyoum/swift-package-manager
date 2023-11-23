@@ -42,7 +42,7 @@ extension BuildPlan {
                 clangTarget.additionalFlags += try pkgConfig(for: target).cFlags
             case let target as BinaryTarget:
                 if case .xcframework = target.kind {
-                    let libraries = try self.parseXCFramework(for: target)
+                    let libraries = try self.parseXCFramework(for: target, target: clangTarget.target)
                     for library in libraries {
                         library.headersPaths.forEach {
                             clangTarget.additionalFlags += ["-I", $0.pathString]

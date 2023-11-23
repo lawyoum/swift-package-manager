@@ -68,10 +68,25 @@ public final class ResolvedTarget {
         public func satisfies(_ environment: BuildEnvironment) -> Bool {
             conditions.allSatisfy { $0.satisfies(environment) }
         }
+
+        var buildToolsDependency: Dependency {
+            switch self {
+            case let .product(product, conditions):
+                let targets = product.targets.map(\.buildToolsTarget)
+                let buildToolsProduct = ResolvedProduct(product: product.underlyingProduct, targets: targets)
+                return .product(buildToolsProduct, conditions: conditions)
+
+            case let .target(target, conditions):
+                return .target(target.buildToolsTarget, conditions: conditions)
+            }
+        }
     }
 
     /// The underlying target represented in this resolved target.
     public let underlyingTarget: Target
+
+    /// Triple for which this resolved target should be compiled for.
+    public let buildTriple: BuildTriple
 
     /// The name of this target.
     public var name: String {
@@ -142,16 +157,56 @@ public final class ResolvedTarget {
     public let platforms: SupportedPlatforms
 
     /// Create a target instance.
-    public init(
+    public convenience init(
         target: Target,
         dependencies: [Dependency],
         defaultLocalization: String?,
         platforms: SupportedPlatforms
     ) {
+        let triple: BuildTriple
+
+        let processedDependencies: [Dependency]
+        if target.type == .macro || target.type == .plugin {
+            triple = .buildTools
+            processedDependencies = dependencies.map(\.buildToolsDependency)
+        } else {
+            triple = .buildProducts
+            processedDependencies = dependencies
+        }
+
+        self.init(
+            target: target,
+            dependencies: processedDependencies,
+            defaultLocalization: defaultLocalization,
+            platforms: platforms,
+            buildTriple: triple
+        )
+    }
+
+    private init(
+        target: Target,
+        dependencies: [Dependency],
+        defaultLocalization: String?,
+        platforms: SupportedPlatforms,
+        buildTriple: BuildTriple
+    ) {
         self.underlyingTarget = target
         self.dependencies = dependencies
         self.defaultLocalization = defaultLocalization
         self.platforms = platforms
+        self.buildTriple = buildTriple
+    }
+
+    var buildToolsTarget: ResolvedTarget {
+        guard self.buildTriple != .buildTools else { return self }
+
+        return Self.init(
+            target: self.underlyingTarget,
+            dependencies: self.dependencies.map(\.buildToolsDependency),
+            defaultLocalization: self.defaultLocalization,
+            platforms: self.platforms,
+            buildTriple: .buildTools
+        )
     }
 }
 

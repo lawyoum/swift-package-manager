@@ -52,9 +52,10 @@ extension BuildPlan {
         // Note: This will come from build settings in future.
         for target in dependencies.staticTargets {
             if case let target as ClangTarget = target.underlyingTarget, target.isCXX {
-                if buildParameters.targetTriple.isDarwin() {
+                let buildTriple = buildProduct.buildTriple
+                if buildTriple.isDarwin() {
                     buildProduct.additionalFlags += ["-lc++"]
-                } else if buildParameters.targetTriple.isWindows() {
+                } else if buildTriple.isWindows() {
                     // Don't link any C++ library.
                 } else {
                     buildProduct.additionalFlags += ["-lstdc++"]
@@ -221,12 +222,12 @@ extension BuildPlan {
                     }
                     switch binaryTarget.kind {
                     case .xcframework:
-                        let libraries = try self.parseXCFramework(for: binaryTarget)
+                        let libraries = try self.parseXCFramework(for: binaryTarget, target: target)
                         for library in libraries {
                             libraryBinaryPaths.insert(library.libraryPath)
                         }
                     case .artifactsArchive:
-                        let tools = try self.parseArtifactsArchive(for: binaryTarget)
+                        let tools = try self.parseArtifactsArchive(for: binaryTarget, target: target)
                         tools.forEach { availableTools[$0.name] = $0.executablePath  }
                     case.unknown:
                         throw InternalError("unknown binary target '\(target.name)' type")
@@ -254,9 +255,15 @@ extension BuildPlan {
     }
 
     /// Extracts the artifacts  from an artifactsArchive
-    private func parseArtifactsArchive(for target: BinaryTarget) throws -> [ExecutableInfo] {
-        try self.externalExecutablesCache.memoize(key: target) {
-            let execInfos = try target.parseArtifactArchives(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
+    private func parseArtifactsArchive(
+        for binaryTarget: BinaryTarget,
+        target: ResolvedTarget
+    ) throws -> [ExecutableInfo] {
+        try self.externalExecutablesCache.memoize(key: binaryTarget) {
+            let execInfos = try binaryTarget.parseArtifactArchives(
+                for: self.buildParameters.buildTriple(for: target),
+                fileSystem: self.fileSystem
+            )
             return execInfos.filter{!$0.supportedTriples.isEmpty}
         }
     }
