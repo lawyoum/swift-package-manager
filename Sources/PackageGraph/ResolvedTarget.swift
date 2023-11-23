@@ -198,6 +198,7 @@ public final class ResolvedTarget {
         self.buildTriple = buildTriple
     }
 
+    /// A copy of this resolved target compiled for the build tools triple.
     var buildToolsTarget: ResolvedTarget {
         guard self.buildTriple != .buildTools else { return self }
 
