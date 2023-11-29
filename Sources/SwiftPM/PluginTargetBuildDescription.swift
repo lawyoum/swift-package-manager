@@ -37,7 +37,9 @@ struct PluginTargetBuildDescription: BuildTarget {
     func compileArguments() throws -> [String] {
         // FIXME: This is very odd and we should clean this up by merging `ManifestLoader` and `DefaultPluginScriptRunner` again.
         let loader = ManifestLoader(toolchain: try UserToolchain(swiftSDK: .hostSwiftSDK()))
-        return loader.interpreterFlags(for: self.toolsVersion)
+        var args = loader.interpreterFlags(for: self.toolsVersion)
+        args += sources.map { $0.path }
+        return args
     }
 
 

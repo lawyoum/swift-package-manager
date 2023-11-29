@@ -33,7 +33,7 @@ extension ClangTargetBuildDescription: BuildTarget {
 
     public func compileArguments() throws -> [String] {
         var args = try self.basicArguments()
-        args += sources.map { $0.absoluteString }
+        args += sources.map { $0.path }
         return args
     }
 }
@@ -57,7 +57,7 @@ private struct WrappedSwiftTargetBuildDescription: BuildTarget {
 
     func compileArguments() throws -> [String] {
         var args = try description.compileArguments()
-        args += sources.map { $0.absoluteString }
+        args += sources.map { $0.path }
         args += ["-I", buildParameters.buildPath.pathString]
         return args
     }
