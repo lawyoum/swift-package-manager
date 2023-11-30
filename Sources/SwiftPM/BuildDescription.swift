@@ -12,6 +12,8 @@
 
 import Foundation
 
+/*private*/ import struct Basics.AbsolutePath
+/*private*/ import func Basics.resolveSymlinks
 // FIXME: should not import this module
 import Build
 // FIXME: should be internal imports
@@ -20,10 +22,10 @@ import PackageGraph
 
 public protocol BuildTarget {
     // FIXME: should not use `ResolvedTarget` in the public interface
-     var target: ResolvedTarget { get }
-     var sources: [URL] { get }
+    var target: ResolvedTarget { get }
+    var sources: [URL] { get }
 
-     func compileArguments() throws -> [String]
+    func compileArguments(for fileURL: URL) throws -> [String]
  }
 
 extension ClangTargetBuildDescription: BuildTarget {
@@ -31,10 +33,9 @@ extension ClangTargetBuildDescription: BuildTarget {
         return (try? compilePaths().map { URL(fileURLWithPath: $0.source.pathString) }) ?? []
     }
 
-    public func compileArguments() throws -> [String] {
-        var args = try self.basicArguments()
-        args += sources.map { $0.path }
-        return args
+    public func compileArguments(for fileURL: URL) throws -> [String] {
+        let filePath = try resolveSymlinks(try AbsolutePath(validating: fileURL.path))
+        return try self.emitCommandLine(for: filePath)
     }
 }
 
@@ -55,11 +56,9 @@ private struct WrappedSwiftTargetBuildDescription: BuildTarget {
         return description.sources.map { URL(fileURLWithPath: $0.pathString) }
     }
 
-    func compileArguments() throws -> [String] {
-        var args = try description.compileArguments()
-        args += sources.map { $0.path }
-        args += ["-I", buildParameters.buildPath.pathString]
-        return args
+    func compileArguments(for fileURL: URL) throws -> [String] {
+        // Note: we ignore the `fileURL` here as the expectation is that we get a commandline for the entire target in case of Swift.
+        return try description.emitCommandLine(scanInvocation: false)
     }
 }
 

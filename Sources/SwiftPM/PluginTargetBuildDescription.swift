@@ -34,10 +34,11 @@ struct PluginTargetBuildDescription: BuildTarget {
         return target.sources.paths.map { URL(fileURLWithPath: $0.pathString) }
     }
 
-    func compileArguments() throws -> [String] {
+    func compileArguments(for fileURL: URL) throws -> [String] {
         // FIXME: This is very odd and we should clean this up by merging `ManifestLoader` and `DefaultPluginScriptRunner` again.
         let loader = ManifestLoader(toolchain: try UserToolchain(swiftSDK: .hostSwiftSDK()))
         var args = loader.interpreterFlags(for: self.toolsVersion)
+        // Note: we ignore the `fileURL` here as the expectation is that we get a commandline for the entire target in case of Swift. Plugins are always assumed to only consist of Swift files.
         args += sources.map { $0.path }
         return args
     }
