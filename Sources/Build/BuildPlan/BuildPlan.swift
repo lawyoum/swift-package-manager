@@ -471,7 +471,7 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
         for target in targets {
             switch target {
             case .swift(let targetDescription):
-                arguments += ["-I", targetDescription.moduleOutputPath.pathString]
+                arguments += ["-I", targetDescription.moduleOutputPath.parentDirectory.pathString]
             case .clang(let targetDescription):
                 if let includeDir = targetDescription.moduleMap?.parentDirectory {
                     arguments += ["-I", includeDir.pathString]
