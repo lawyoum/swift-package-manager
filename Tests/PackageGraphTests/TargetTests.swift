@@ -16,9 +16,9 @@ import PackageGraph
 import PackageModel
 
 private extension ResolvedTarget {
-    convenience init(name: String, deps: ResolvedTarget...) {
+    init(name: String, deps: ResolvedTarget...) {
         self.init(
-            target: SwiftTarget(
+            underlying: SwiftTarget(
                 name: name,
                 type: .library,
                 path: .root,
@@ -30,8 +30,8 @@ private extension ResolvedTarget {
             ),
             dependencies: deps.map { .target($0, conditions: []) },
             defaultLocalization: nil,
-            platforms: [],
-            platformVersionProvider: .init(derivedXCTestPlatformProvider:  .none)
+            supportedPlatforms: [],
+            platformVersionProvider: .init(implementation: .empty)
         )
     }
 }

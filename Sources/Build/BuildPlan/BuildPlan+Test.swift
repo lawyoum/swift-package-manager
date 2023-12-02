@@ -16,8 +16,8 @@ import struct Basics.AbsolutePath
 import struct LLBuildManifest.TestDiscoveryTool
 import struct LLBuildManifest.TestEntryPointTool
 import struct PackageGraph.PackageGraph
-import class PackageGraph.ResolvedProduct
-import class PackageGraph.ResolvedTarget
+import struct PackageGraph.ResolvedProduct
+import struct PackageGraph.ResolvedTarget
 import struct PackageModel.Sources
 import class PackageModel.SwiftTarget
 import class PackageModel.Target
@@ -84,10 +84,10 @@ extension BuildPlan {
                     testDiscoverySrc: Sources(paths: discoveryPaths, root: discoveryDerivedDir)
                 )
                 let discoveryResolvedTarget = ResolvedTarget(
-                    target: discoveryTarget,
+                    underlying: discoveryTarget,
                     dependencies: testProduct.targets.map { .target($0, conditions: []) },
                     defaultLocalization: testProduct.defaultLocalization,
-                    platforms: testProduct.platforms,
+                    supportedPlatforms: testProduct.platforms,
                     platformVersionProvider: testProduct.platformVersionProvider
                 )
                 let discoveryTargetBuildDescription = try SwiftTargetBuildDescription(
@@ -118,10 +118,10 @@ extension BuildPlan {
                     testEntryPointSources: entryPointSources
                 )
                 let entryPointResolvedTarget = ResolvedTarget(
-                    target: entryPointTarget,
+                    underlying: entryPointTarget,
                     dependencies: testProduct.targets.map { .target($0, conditions: []) } + [.target(discoveryResolvedTarget, conditions: [])],
                     defaultLocalization: testProduct.defaultLocalization,
-                    platforms: testProduct.platforms,
+                    supportedPlatforms: testProduct.platforms,
                     platformVersionProvider: testProduct.platformVersionProvider
                 )
                 return try SwiftTargetBuildDescription(
@@ -148,10 +148,10 @@ extension BuildPlan {
                             testEntryPointSources: entryPointResolvedTarget.underlying.sources
                         )
                         let entryPointResolvedTarget = ResolvedTarget(
-                            target: entryPointTarget,
+                            underlying: entryPointTarget,
                             dependencies: entryPointResolvedTarget.dependencies + [.target(discoveryTargets.resolved, conditions: [])],
                             defaultLocalization: testProduct.defaultLocalization,
-                            platforms: testProduct.platforms,
+                            supportedPlatforms: testProduct.platforms,
                             platformVersionProvider: testProduct.platformVersionProvider
                         )
                         let entryPointTargetBuildDescription = try SwiftTargetBuildDescription(

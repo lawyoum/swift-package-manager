@@ -174,7 +174,7 @@ public final class ResolvedTargetResult {
     }
 
     public func checkDeclaredPlatforms(_ platforms: [String: String], file: StaticString = #file, line: UInt = #line) {
-        let targetPlatforms = Dictionary(uniqueKeysWithValues: target.platforms.map({ ($0.platform.name, $0.version.versionString) }))
+        let targetPlatforms = Dictionary(uniqueKeysWithValues: target.supportedPlatforms.map { ($0.platform.name, $0.version.versionString) })
         XCTAssertEqual(platforms, targetPlatforms, file: file, line: line)
     }
 

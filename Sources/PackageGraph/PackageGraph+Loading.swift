@@ -152,13 +152,9 @@ extension PackageGraph {
             rootManifests: root.manifests,
             unsafeAllowedPackages: unsafeAllowedPackages,
             platformRegistry: customPlatformsRegistry ?? .default,
-            platformVersionProvider: .init(derivedXCTestPlatformProvider: { declared in
-                if let customXCTestMinimumDeploymentTargets {
-                    return customXCTestMinimumDeploymentTargets[declared]
-                } else {
-                    return MinimumDeploymentTarget.default.computeXCTestMinimumDeploymentTarget(for: declared)
-                }
-            }),
+            platformVersionProvider: .init(
+                implementation: .customXCTestMinimumDeploymentTargets(customXCTestMinimumDeploymentTargets)
+            ),
             fileSystem: fileSystem,
             observabilityScope: observabilityScope
         )
@@ -929,12 +925,10 @@ private final class ResolvedTargetBuilder: ResolvedBuilder<ResolvedTarget> {
         }
 
         return ResolvedTarget(
-            storage: .init(
-                underlying: self.target,
-                dependencies: dependencies,
-                defaultLocalization: self.defaultLocalization,
-                supportedPlatforms: self.platforms
-            ),
+            underlying: self.target,
+            dependencies: dependencies,
+            defaultLocalization: self.defaultLocalization,
+            supportedPlatforms: self.platforms,
             platformVersionProvider: self.platformVersionProvider
         )
     }
