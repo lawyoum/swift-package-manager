@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,15 +14,15 @@ import PackageModel
 
 import func TSCBasic.topologicalSort
 
-/// Represents a fully resolved target. All the dependencies for the target are resolved.
-public final class ResolvedTarget {
+/// Represents a fully resolved target. All the dependencies for this target are also stored as resolved.
+public struct ResolvedTarget: Hashable {
     /// Represents dependency of a resolved target.
-    public enum Dependency {
+    public enum Dependency: Hashable {
         /// Direct dependency of the target. This target is in the same package and should be statically linked.
-        case target(_ target: ResolvedTarget, conditions: [PackageConditionProtocol])
+        case target(_ target: ResolvedTarget, conditions: [PackageCondition])
 
         /// The target depends on this product.
-        case product(_ product: ResolvedProduct, conditions: [PackageConditionProtocol])
+        case product(_ product: ResolvedProduct, conditions: [PackageCondition])
 
         public var target: ResolvedTarget? {
             switch self {
@@ -38,7 +38,7 @@ public final class ResolvedTarget {
             }
         }
 
-        public var conditions: [PackageConditionProtocol] {
+        public var conditions: [PackageCondition] {
             switch self {
             case .target(_, let conditions): return conditions
             case .product(_, let conditions): return conditions
@@ -67,14 +67,14 @@ public final class ResolvedTarget {
 
         public func satisfies(_ environment: BuildEnvironment) -> Bool {
             conditions.allSatisfy { $0.satisfies(environment) }
-        }
+        } 
 
         /// A copy of this dependency compiled for the build tool (host) triple.
         var buildToolsDependency: Dependency {
             switch self {
             case let .product(product, conditions):
                 let targets = product.targets.map(\.buildToolsTarget)
-                let buildToolsProduct = ResolvedProduct(product: product.underlyingProduct, targets: targets)
+                let buildToolsProduct = ResolvedProduct(product: product.underlying, targets: targets)
                 return .product(buildToolsProduct, conditions: conditions)
 
             case let .target(target, conditions):
@@ -83,19 +83,13 @@ public final class ResolvedTarget {
         }
     }
 
-    /// The underlying target represented in this resolved target.
-    public let underlyingTarget: Target
-
     /// Triple for which this resolved target should be compiled for.
-    public let buildTriple: BuildTriple
+    public var buildTriple: BuildTriple
 
     /// The name of this target.
     public var name: String {
-        return underlyingTarget.name
+        return underlying.name
     }
-
-    /// The dependencies of this target.
-    public let dependencies: [Dependency]
 
     /// Returns dependencies which satisfy the input build environment, based on their conditions.
     /// - Parameters:
@@ -126,48 +120,56 @@ public final class ResolvedTarget {
 
     /// The language-level target name.
     public var c99name: String {
-        return underlyingTarget.c99name
+        return underlying.c99name
     }
 
     /// Module aliases for dependencies of this target. The key is an
     /// original target name and the value is a new unique name mapped
     /// to the name of its .swiftmodule binary.
     public var moduleAliases: [String: String]? {
-      return underlyingTarget.moduleAliases
+      return underlying.moduleAliases
     }
 
     /// Allows access to package symbols from other targets in the package
     public var packageAccess: Bool {
-        return underlyingTarget.packageAccess
+        return underlying.packageAccess
     }
 
     /// The "type" of target.
     public var type: Target.Kind {
-        return underlyingTarget.type
+        return underlying.type
     }
 
     /// The sources for the target.
     public var sources: Sources {
-        return underlyingTarget.sources
+        return underlying.sources
     }
+
+    /// The underlying target represented in this resolved target.
+    public let underlying: Target
+
+    /// The dependencies of this target.
+    public let dependencies: [Dependency]
 
     /// The default localization for resources.
     public let defaultLocalization: String?
 
     /// The list of platforms that are supported by this target.
-    public let platforms: SupportedPlatforms
+    public let supportedPlatforms: [SupportedPlatform]
 
-    /// Create a target instance.
-    public convenience init(
-        target: Target,
-        dependencies: [Dependency],
-        defaultLocalization: String?,
-        platforms: SupportedPlatforms
+    private let platformVersionProvider: PlatformVersionProvider
+
+    public init(
+        underlying: Target,
+        dependencies: [ResolvedTarget.Dependency],
+        defaultLocalization: String? = nil,
+        supportedPlatforms: [SupportedPlatform],
+        platformVersionProvider: PlatformVersionProvider
     ) {
         let triple: BuildTriple
 
         let processedDependencies: [Dependency]
-        if target.type == .macro || target.type == .plugin {
+        if underlying.type == .macro || underlying.type == .plugin {
             triple = .buildTools
             processedDependencies = dependencies.map(\.buildToolsDependency)
         } else {
@@ -175,80 +177,36 @@ public final class ResolvedTarget {
             processedDependencies = dependencies
         }
 
-        self.init(
-            target: target,
-            dependencies: processedDependencies,
-            defaultLocalization: defaultLocalization,
-            platforms: platforms,
-            buildTriple: triple
-        )
+        self.underlying = underlying
+        self.dependencies = processedDependencies
+        self.defaultLocalization = defaultLocalization
+        self.supportedPlatforms = supportedPlatforms
+        self.platformVersionProvider = platformVersionProvider
+        self.buildTriple = triple
     }
 
-    private init(
-        target: Target,
-        dependencies: [Dependency],
-        defaultLocalization: String?,
-        platforms: SupportedPlatforms,
-        buildTriple: BuildTriple
-    ) {
-        self.underlyingTarget = target
-        self.dependencies = dependencies
-        self.defaultLocalization = defaultLocalization
-        self.platforms = platforms
-        self.buildTriple = buildTriple
+    public func getDerived(for platform: Platform, usingXCTest: Bool) -> SupportedPlatform {
+        self.platformVersionProvider.getDerived(
+            declared: self.supportedPlatforms,
+            for: platform,
+            usingXCTest: usingXCTest
+        )
     }
 
     /// A copy of this resolved target compiled for the build tools triple.
     var buildToolsTarget: ResolvedTarget {
         guard self.buildTriple != .buildTools else { return self }
 
-        return Self.init(
-            target: self.underlyingTarget,
-            dependencies: self.dependencies.map(\.buildToolsDependency),
-            defaultLocalization: self.defaultLocalization,
-            platforms: self.platforms,
-            buildTriple: .buildTools
-        )
-    }
-}
+        var result = self
+        result.buildTriple = .buildTools
 
-extension ResolvedTarget: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
-    }
-
-    public static func == (lhs: ResolvedTarget, rhs: ResolvedTarget) -> Bool {
-        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+        return result
     }
 }
 
 extension ResolvedTarget: CustomStringConvertible {
     public var description: String {
         return "<ResolvedTarget: \(name)>"
-    }
-}
-
-extension ResolvedTarget.Dependency: Equatable {
-    public static func == (lhs: ResolvedTarget.Dependency, rhs: ResolvedTarget.Dependency) -> Bool {
-        switch (lhs, rhs) {
-        case (.target(let lhsTarget, _), .target(let rhsTarget, _)):
-            return lhsTarget == rhsTarget
-        case (.product(let lhsProduct, _), .product(let rhsProduct, _)):
-            return lhsProduct == rhsProduct
-        case (.product, .target), (.target, .product):
-            return false
-        }
-    }
-}
-
-extension ResolvedTarget.Dependency: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .target(let target, _):
-            hasher.combine(target)
-        case .product(let product, _):
-            hasher.combine(product)
-        }
     }
 }
 

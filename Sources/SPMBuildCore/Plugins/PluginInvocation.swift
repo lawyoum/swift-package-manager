@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2021-2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2021-2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -348,15 +348,15 @@ extension PackageGraph {
             for dependency in target.dependencies(satisfying: buildEnvironment) {
                 switch dependency {
                 case .target(let target, _):
-                    if let pluginTarget = target.underlyingTarget as? PluginTarget {
+                    if let pluginTarget = target.underlying as? PluginTarget {
                         assert(pluginTarget.capability == .buildTool)
                         pluginTargets.append(pluginTarget)
                     }
                     else {
-                        dependencyTargets.append(target.underlyingTarget)
+                        dependencyTargets.append(target.underlying)
                     }
                 case .product(let product, _):
-                    pluginTargets.append(contentsOf: product.targets.compactMap{ $0.underlyingTarget as? PluginTarget })
+                    pluginTargets.append(contentsOf: product.targets.compactMap{ $0.underlying as? PluginTarget })
                 }
             }
 
@@ -537,7 +537,10 @@ public extension PluginTarget {
                 builtToolName = target.name
                 executableOrBinaryTarget = target
             case .product(let productRef, _):
-                guard let product = packageGraph.allProducts.first(where: { $0.name == productRef.name }), let executableTarget = product.targets.map({ $0.underlyingTarget }).executables.spm_only else {
+                guard
+                    let product = packageGraph.allProducts.first(where: { $0.name == productRef.name }),
+                    let executableTarget = product.targets.map({ $0.underlying }).executables.spm_only
+                else {
                     throw StringError("no product named \(productRef.name)")
                 }
                 builtToolName = productRef.name
@@ -584,7 +587,7 @@ public extension PluginTarget {
 }
 
 fileprivate extension Target.Dependency {
-    var conditions: [PackageConditionProtocol] {
+    var conditions: [PackageCondition] {
         switch self {
         case .target(_, let conditions): return conditions
         case .product(_, let conditions): return conditions

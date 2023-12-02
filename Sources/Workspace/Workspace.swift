@@ -13,7 +13,6 @@
 import _Concurrency
 import Basics
 import Foundation
-import OrderedCollections
 import PackageFingerprint
 import PackageGraph
 import PackageLoading
@@ -528,6 +527,7 @@ public class Workspace {
             authorizationProvider: authorizationProvider,
             hostToolchain: hostToolchain,
             checksumAlgorithm: checksumAlgorithm,
+            cachePath:  customBinaryArtifactsManager?.useCache == false || !configuration.sharedDependenciesCacheEnabled ? .none : location.sharedBinaryArtifactsCacheDirectory,
             customHTTPClient: customBinaryArtifactsManager?.httpClient,
             customArchiver: customBinaryArtifactsManager?.archiver,
             delegate: delegate.map(WorkspaceBinaryArtifactsManagerDelegate.init(workspaceDelegate:))
@@ -949,6 +949,7 @@ extension Workspace {
     }
 
     /// Loads and returns manifests at the given paths.
+    @available(*, noasync, message: "Use the async alternative")
     public func loadRootManifests(
         packages: [AbsolutePath],
         observabilityScope: ObservabilityScope,
@@ -1122,9 +1123,20 @@ extension Workspace {
         }
         return importList
     }
+    
+    public func loadPackage(
+        with identity: PackageIdentity,
+        packageGraph: PackageGraph,
+        observabilityScope: ObservabilityScope
+    ) async throws -> Package {
+        try await safe_async {
+            self.loadPackage(with: identity, packageGraph: packageGraph, observabilityScope: observabilityScope, completion: $0)
+        }
+    }
 
     /// Loads a single package in the context of a previously loaded graph. This can be useful for incremental loading
     /// in a longer-lived program, like an IDE.
+    @available(*, noasync, message: "Use the async alternative")
     public func loadPackage(
         with identity: PackageIdentity,
         packageGraph: PackageGraph,
@@ -1137,9 +1149,9 @@ extension Workspace {
 
         self.loadManifest(
             packageIdentity: identity,
-            packageKind: previousPackage.underlyingPackage.manifest.packageKind,
+            packageKind: previousPackage.underlying.manifest.packageKind,
             packagePath: previousPackage.path,
-            packageLocation: previousPackage.underlyingPackage.manifest.packageLocation,
+            packageLocation: previousPackage.underlying.manifest.packageLocation,
             observabilityScope: observabilityScope
         ) { result in
             let result = result.tryMap { manifest -> Package in

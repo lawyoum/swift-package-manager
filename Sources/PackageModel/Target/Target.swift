@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Basics
-import Dispatch
 
 import protocol TSCUtility.PolymorphicCodableProtocol
 
@@ -42,9 +41,9 @@ public class Target: PolymorphicCodableProtocol {
         case package
         case excluded
     }
+
     /// A reference to a product from a target dependency.
     public struct ProductReference: Codable {
-
         /// The name of the product dependency.
         public let name: String
 
@@ -79,10 +78,10 @@ public class Target: PolymorphicCodableProtocol {
     /// A target dependency to a target or product.
     public enum Dependency {
         /// A dependency referencing another target, with conditions.
-        case target(_ target: Target, conditions: [PackageConditionProtocol])
+        case target(_ target: Target, conditions: [PackageCondition])
 
         /// A dependency referencing a product, with conditions.
-        case product(_ product: ProductReference, conditions: [PackageConditionProtocol])
+        case product(_ product: ProductReference, conditions: [PackageCondition])
 
         /// The target if the dependency is a target dependency.
         public var target: Target? {
@@ -103,7 +102,7 @@ public class Target: PolymorphicCodableProtocol {
         }
 
         /// The dependency conditions.
-        public var conditions: [PackageConditionProtocol] {
+        public var conditions: [PackageCondition] {
             switch self {
             case .target(_, let conditions):
                 return conditions

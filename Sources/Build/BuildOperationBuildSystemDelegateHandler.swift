@@ -219,13 +219,13 @@ final class TestEntryPointCommand: CustomLLBuildCommand, TestBuildCommand {
             stream.send(
                 #"""
                 #if canImport(Testing)
-                @_spi(SwiftPackageManagerSupport) import Testing
+                import Testing
                 #endif
 
                 @main struct Runner {
                     static func main() async {
                 #if canImport(Testing)
-                        await Testing.swiftPMEntryPoint() as Never
+                        await Testing.__swiftPMEntryPoint() as Never
                 #endif
                     }
                 }
@@ -810,10 +810,8 @@ final class BuildOperationBuildSystemDelegateHandler: LLBuildBuildSystemDelegate
         queue.async {
             if let buffer = self.nonSwiftMessageBuffers[command.name] {
                 self.progressAnimation.clear()
-                if self.logLevel.isVerbose {
-                    self.outputStream.send(buffer)
-                    self.outputStream.flush()
-                }
+                self.outputStream.send(buffer)
+                self.outputStream.flush()
                 self.nonSwiftMessageBuffers[command.name] = nil
             }
         }
