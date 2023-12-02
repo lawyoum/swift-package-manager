@@ -68,7 +68,7 @@ extension BuildPlan {
             switch target.underlying {
             case is SwiftTarget:
                 // Swift targets are guaranteed to have a corresponding Swift description.
-                guard case .swift(let description) = targetMap[target] else {
+                guard case .swift(let description) = self.targetMap[target] else {
                     throw InternalError("unknown target \(target)")
                 }
 
